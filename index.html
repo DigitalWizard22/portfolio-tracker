@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Portfolio</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F1420;--card:#151C2C;--chip:#1B2438;--ink:#F2F5FA;--mut:#8C97AD;--line:#232D44;--sky:#3BB0F0;--blue:#3B82F6;--teal:#5CC4A8;--up:#5CC4A8;--down:#F06B5A;--upbg:rgba(92,196,168,.15);--downbg:rgba(240,107,90,.15);--g1:#47B8F5;--g2:#2F66E6;color-scheme:dark;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#EEF2F8;--card:#FFFFFF;--chip:#E4EAF4;--ink:#101828;--mut:#5F6B82;--line:#D9E0EC;--sky:#1C8FD0;--up:#1E9A7A;--down:#D9473A;--upbg:rgba(30,154,122,.12);--downbg:rgba(217,71,58,.12);color-scheme:light}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.35}
+main{max-width:480px;margin:0 auto;padding:20px 16px 48px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+a{color:inherit;text-decoration:none}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.top h1{font-size:24px;font-weight:800;margin:0;flex:1}
+.back{width:40px;height:40px;border-radius:12px;background:var(--chip);display:grid;place-items:center;font-size:20px}
+.hero{border-radius:28px;padding:22px;background:linear-gradient(120deg,var(--g1),var(--g2));color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hero small{font-size:15px;opacity:.9;font-weight:500}
+.hero .big{font-size:clamp(30px,9vw,38px);font-weight:800;letter-spacing:-.02em}
+.plus{width:56px;height:56px;border-radius:50%;background:#fff;color:#2F8FE8;font-size:32px;font-weight:500;display:grid;place-items:center;flex:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:18px;margin-top:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.lbl{color:var(--mut);font-size:14px;font-weight:500}
+.val{font-size:22px;font-weight:800;margin-top:2px}
+.up{color:var(--up)}.down{color:var(--down)}
+.pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:14px;font-weight:700;margin-top:6px}
+.pill.up{background:var(--upbg)}.pill.down{background:var(--downbg)}.pill.neutral{background:var(--chip);color:var(--ink)}
+h2{font-size:22px;font-weight:800;margin:0}
+.mix{display:flex;align-items:center;gap:22px;margin-top:14px}
+.pie{width:128px;height:128px;border-radius:50%;flex:none}
+.leg{flex:1;display:grid;gap:12px;font-size:15px}
+.leg div{display:flex;align-items:center;gap:8px}
+.leg i{width:12px;height:12px;border-radius:50%;flex:none}
+.leg b{margin-left:auto}
+.sechead{display:flex;justify-content:space-between;align-items:center;margin:26px 0 12px}
+.btn{background:var(--sky);color:#06202E;font-weight:800;border-radius:99px;padding:11px 20px;min-height:44px}
+.btn.soft{background:var(--chip);color:var(--ink)}
+.acct{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px 16px;margin-bottom:12px;border-left:5px solid var(--down)}
+.acct.gain{border-left-color:var(--up)}
+.ico{width:52px;height:52px;border-radius:16px;background:var(--chip);display:grid;place-items:center;color:var(--sky);font-weight:800;font-size:22px;flex:none}
+.acct .t{font-weight:800;font-size:19px}
+.acct .r{margin-left:auto;text-align:right}
+.cols{display:grid;grid-template-columns:1.5fr 1fr 1fr 24px;gap:8px;color:var(--mut);font-size:14px;padding:0 6px;margin-bottom:8px}
+.cols span:nth-child(2),.cols span:nth-child(3){text-align:right}
+.hold{background:var(--card);border:1px solid var(--line);border-radius:20px;margin-bottom:12px;overflow:hidden}
+.hrow{display:grid;grid-template-columns:1.5fr 1fr 1fr 24px;gap:8px;align-items:center;width:100%;text-align:left;padding:14px 12px 14px 14px;min-height:64px}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:40px;height:40px;border-radius:50%;background:var(--g2);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.tk{font-weight:800;color:var(--sky)}
+.nm{font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mid,.pl{text-align:right;font-weight:700}
+.mid small{display:block;color:var(--mut);font-weight:500}
+.edit{display:none;grid-template-columns:1fr 1fr;gap:10px;padding:4px 14px 16px}
+.hold.open .edit{display:grid}
+.hold.open .chev{transform:rotate(180deg)}
+.chev{transition:transform .15s}
+.edit label,.sheet label{font-size:12px;color:var(--mut);display:block;margin-bottom:3px}
+input,select{width:100%;background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:44px}
+.del{grid-column:1/-1;color:var(--down);font-weight:700;min-height:40px}
+.empty{color:var(--mut);text-align:center;padding:24px}
+.note{color:var(--mut);font-size:13px;margin-top:18px}
+.sheet{position:fixed;inset:0;background:rgba(5,8,15,.6);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.sheet.open{display:flex}
+.sheet .in{background:var(--card);width:100%;max-width:480px;border-radius:26px 26px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:92vh;overflow:auto}
+.sheet h3{grid-column:1/-1;margin:0;font-size:20px}
+.sheet .full{grid-column:1/-1}
+.sheet .acts{grid-column:1/-1;display:flex;gap:10px}.sheet .acts button{flex:1}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div class="sheet" id="sheet"><div class="in">
+  <h3>Add holding</h3>
+  <div><label for="fKind">Type</label><select id="fKind"><option value="stock">Stock</option><option value="fund">Fund</option></select></div>
+  <div><label for="fTicker">Ticker</label><input id="fTicker" placeholder="e.g. RCR"></div>
+  <div class="full"><label for="fName">Name</label><input id="fName" placeholder="e.g. RL Commercial REIT"></div>
+  <div><label for="fShares">Shares or units</label><input id="fShares" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div><label for="fAvg">Average price (₱)</label><input id="fAvg" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div><label for="fPrice">Price now (₱, optional)</label><input id="fPrice" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div><label for="fDiv">Dividend per share a year (₱)</label><input id="fDiv" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div class="acts"><button class="btn soft" id="cancel">Cancel</button><button class="btn" id="save">Save holding</button></div>
+</div></div>
+<script>
+const KEY = "portfolio-v2";
+const seed = [
+  {id:1, kind:"stock", ticker:"GCASH", name:"Mynt, Inc.", shares:100, avg:7.47, price:7.18, div:0},
+  {id:2, kind:"stock", ticker:"RCR", name:"RL Commercial REIT", shares:100, avg:5.9979, price:5.95, div:0.4584},
+  {id:3, kind:"fund", ticker:"ATRGTEC", name:"ATRAM Global Technology Feeder Fund", shares:2, avg:522.2, price:494.005, div:0}
+];
+let items = load(), openId = null;
+function load(){ try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch(e){} return seed.map(x => ({...x})); }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){} }
+const $ = id => document.getElementById(id);
+const money = n => (n < 0 ? "-" : "") + "₱" + Math.abs(n).toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
+const signed = n => (n > 0 ? "+" : "") + (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
+const num = n => String(+(+n).toFixed(4));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const calc = h => { const cost = h.shares * h.avg, val = h.shares * h.price; return {cost, val, pl:val - cost, pct:cost ? (val - cost) / cost * 100 : 0}; };
+const sum = list => { const t = {cost:0, val:0, div:0}; list.forEach(h => { const c = calc(h); t.cost += c.cost; t.val += c.val; t.div += h.shares * h.div; }); t.pl = t.val - t.cost; t.pct = t.cost ? t.pl / t.cost * 100 : 0; return t; };
+const pill = p => `<span class="pill ${p >= 0 ? "up" : "down"}">${p >= 0 ? "▲" : "▼"} ${Math.abs(p).toFixed(2)}%</span>`;
+const kinds = {stock:{title:"Stock Holdings", sub:"PH Stocks", all:"All Stocks", icon:"₱"}, fund:{title:"Fund Portfolio", sub:"PH Mutual Funds / UITFs", all:"All Funds", icon:"₱"}};
+
+function home(){
+  const t = sum(items), s = sum(items.filter(h => h.kind === "stock")), f = sum(items.filter(h => h.kind === "fund"));
+  const sp = t.val ? s.val / t.val * 100 : 0, fp = t.val ? f.val / t.val * 100 : 0;
+  const acct = (k, a) => `<a class="acct ${a.pl >= 0 ? "gain" : ""}" href="#${k}s"><div class="ico">₱</div><div><div class="t">${kinds[k].title}</div><div class="lbl">${kinds[k].sub}</div></div><div class="r"><div class="val" style="font-size:19px">${money(a.val)}</div>${pill(a.pct)}</div></a>`;
+  return `<div class="top"><h1>My portfolio</h1><button class="btn soft" data-refresh>↻ Refresh</button></div>${statusLine()}
+  <div class="hero"><div><small>Portfolio value</small><div class="big">${money(t.val)}</div></div></div>
+  <div class="card row2"><div><div class="lbl">Invested</div><div class="val">${money(t.cost)}</div></div><div><div class="lbl">Total return</div><div class="val ${t.pl >= 0 ? "up" : "down"}">${signed(t.pl)}</div>${pill(t.pct)}</div></div>
+  <div class="card"><h2>Portfolio mix</h2><div class="lbl">How your investments are allocated</div>
+    <div class="mix"><div class="pie" style="background:conic-gradient(var(--blue) 0 ${sp}%,var(--teal) ${sp}% 100%)"></div>
+    <div class="leg"><div><i style="background:var(--blue)"></i>Stocks<b style="color:var(--blue)">${sp.toFixed(0)}%</b></div><div><i style="background:var(--teal)"></i>Funds<b style="color:var(--teal)">${fp.toFixed(0)}%</b></div></div></div></div>
+  <div class="sechead"><div><h2>Accounts</h2><div class="lbl">All balances in one view</div></div><button class="btn" data-add="stock">+ Add</button></div>
+  ${acct("stock", s)}${acct("fund", f)}
+  <p class="note">Prices don’t update on their own. Open an account, tap a holding, and type today’s price to refresh your gain or loss. Data is saved in this browser only.</p>`;
+}
+
+function account(k){
+  const list = items.filter(h => h.kind === k), t = sum(list), y = t.cost ? t.div / t.cost * 100 : 0;
+  const rows = list.length ? list.map(h => { const c = calc(h); return `<div class="hold ${openId === h.id ? "open" : ""}">
+    <button class="hrow" data-open="${h.id}" aria-expanded="${openId === h.id}">
+      <div class="who"><div class="logo">${esc(h.ticker.slice(0,2))}</div><div style="min-width:0"><div class="tk">${esc(h.ticker)}</div><div class="nm">${esc(h.name)}</div></div></div>
+      <div class="mid">${num(h.avg)}<small>${num(h.shares)}</small></div>
+      <div class="pl ${c.pl >= 0 ? "up" : "down"}">${signed(c.pl)}<br>${pill(c.pct)}</div>
+      <span class="chev">⌄</span></button>
+    <div class="edit">
+      <div><label>Shares or units</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.shares}" data-id="${h.id}" data-f="shares"></div>
+      <div><label>Average price</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.avg}" data-id="${h.id}" data-f="avg"></div>
+      <div><label>Price now</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.price}" data-id="${h.id}" data-f="price"></div>
+      <div><label>Dividend per share a year</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.div}" data-id="${h.id}" data-f="div"></div>
+      <button class="del" data-del="${h.id}">Remove ${esc(h.ticker)}</button>
+    </div></div>`; }).join("") : `<div class="empty">Nothing here yet. Tap + to add your first holding.</div>`;
+  return `<div class="top"><a class="back" href="#home" aria-label="Back to portfolio">←</a><h1>${kinds[k].title}</h1><button class="btn soft" data-refresh aria-label="Refresh prices">↻</button></div>${statusLine()}
+  <div class="hero"><div><small>Portfolio value</small><div class="big">${money(t.val)}</div></div><button class="plus" data-add="${k}" aria-label="Add holding">+</button></div>
+  <div class="card row2"><div><div class="lbl">Total return</div><div class="val ${t.pl >= 0 ? "up" : "down"}">${signed(t.pl)}</div>${pill(t.pct)}</div>
+  <div><div class="lbl">Est. dividend per year</div><div class="val">${money(t.div)}</div><span class="pill neutral">${y.toFixed(2)}%</span></div></div>
+  <div class="sechead"><h2>${kinds[k].all}</h2></div>
+  <div class="cols"><span>Holding</span><span>Avg. price</span><span>Profit</span><span></span></div>${rows}`;
+}
+
+function render(){
+  const r = location.hash.slice(1);
+  $("app").innerHTML = r === "stocks" ? account("stock") : r === "funds" ? account("fund") : home();
+}
+window.addEventListener("hashchange", () => { openId = null; render(); window.scrollTo(0, 0); });
+
+$("app").addEventListener("click", e => {
+  const a = e.target.closest("[data-add]"), o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
+  if (a){ $("fKind").value = a.dataset.add; ["fTicker","fName","fShares","fAvg","fPrice","fDiv"].forEach(i => $(i).value = ""); $("sheet").classList.add("open"); $("fTicker").focus(); }
+  if (o){ openId = openId == o.dataset.open ? null : +o.dataset.open; render(); }
+  if (d){ const h = items.find(x => x.id == d.dataset.del); if (confirm("Remove " + h.ticker + " from your portfolio?")){ items = items.filter(x => x.id != h.id); openId = null; save(); render(); } }
+});
+$("app").addEventListener("change", e => {
+  const id = e.target.dataset.id; if (!id) return;
+  const n = parseFloat(e.target.value), h = items.find(x => x.id == id);
+  if (!isNaN(n) && n >= 0){ h[e.target.dataset.f] = n; save(); }
+  render();
+});
+$("cancel").onclick = () => $("sheet").classList.remove("open");
+$("save").onclick = () => {
+  const ticker = $("fTicker").value.trim().toUpperCase(), shares = parseFloat($("fShares").value), avg = parseFloat($("fAvg").value);
+  if (!ticker || isNaN(shares) || isNaN(avg)){ $("fTicker").focus(); return; }
+  const price = parseFloat($("fPrice").value);
+  items.push({id:Date.now(), kind:$("fKind").value, ticker, name:$("fName").value.trim() || ticker, shares, avg, price:isNaN(price) ? avg : price, div:parseFloat($("fDiv").value) || 0});
+  save(); $("sheet").classList.remove("open"); location.hash = $("fKind").value + "s"; render();
+};
+let status = "Prices are manual until live prices load.", timer = null;
+const statusLine = () => `<div class="lbl" style="margin:-8px 2px 12px">${esc(status)}</div>`;
+async function refresh(manual){
+  try {
+    const r = await fetch("/api/prices", {cache:"no-store"}); if (!r.ok) throw new Error("bad status");
+    const d = await r.json(), ok = h => d[h.ticker] && d[h.ticker].price > 0;
+    items.forEach(h => { if (ok(h)) h.price = d[h.ticker].price; });
+    save();
+    const miss = items.filter(h => !ok(h)).map(h => h.ticker);
+    status = "Live prices updated " + new Date().toLocaleTimeString("en-PH", {hour:"2-digit", minute:"2-digit"}) + (miss.length ? " (no price for " + miss.join(", ") + ")" : "");
+    if (!timer) timer = setInterval(() => { if (!document.hidden) refresh(false); }, 60000);
+  } catch(e){ if (manual) status = "Couldn’t load live prices. Try again in a moment."; }
+  if (!document.activeElement || document.activeElement.tagName !== "INPUT") render();
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-refresh]")) refresh(true); });
+render();
+refresh(false);
+</script>
+</body>
+</html>
