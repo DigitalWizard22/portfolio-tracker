@@ -100,6 +100,7 @@ input,select{width:100%;background:var(--chip);border:1px solid var(--line);bord
   <div><label for="fAvg">Average price (₱)</label><input id="fAvg" type="number" step="any" min="0" inputmode="decimal"></div>
   <div><label for="fPrice">Price now (₱, optional)</label><input id="fPrice" type="number" step="any" min="0" inputmode="decimal"></div>
   <div><label for="fDiv">Dividend per share a year (₱)</label><input id="fDiv" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div class="full" id="fBfxW" style="display:none"><label for="fBfx">Rate you bought at (₱ per $)</label><input id="fBfx" type="number" step="any" min="0" inputmode="decimal" placeholder="Leave blank to use today’s rate"></div>
   <div class="acts"><button class="btn soft" id="cancel">Cancel</button><button class="btn" id="save">Save holding</button></div>
 </div></div>
 <script>
@@ -117,10 +118,10 @@ function save(){ try { localStorage.setItem(KEY, JSON.stringify(items)); } catch
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? "-" : "") + "₱" + Math.abs(n).toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
 const signed = n => (n > 0 ? "+" : "") + (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
-const num = n => String(+(+n).toFixed(4));
+const num = n => String(+(+n).toFixed(4)), px = n => String(+(+n).toFixed(n >= 100 ? 2 : 4));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const calc = h => { const m = h.mkt === "US" ? fx : 1, cost = h.shares * h.avg * m, val = h.shares * h.price * m; return {cost, val, pl:val - cost, pct:cost ? (val - cost) / cost * 100 : 0, day: h.chg ? val - val / (1 + h.chg / 100) : 0}; };
-const sum = list => { const t = {cost:0, val:0, div:0, day:0}; list.forEach(h => { const c = calc(h); t.cost += c.cost; t.val += c.val; t.day += c.day; t.div += h.shares * h.div * (h.mkt === "US" ? fx : 1); }); t.pl = t.val - t.cost; t.pct = t.cost ? t.pl / t.cost * 100 : 0; return t; };
+const calc = h => { const us = h.mkt === "US", m = us ? fx : 1, b = us ? (h.bfx || fx) : 1, cost = h.shares * h.avg * b, val = h.shares * h.price * m; return {cost, val, pl:val - cost, pct:cost ? (val - cost) / cost * 100 : 0, day: h.chg ? val - val / (1 + h.chg / 100) : 0, px: h.shares * (h.price - h.avg) * b, cur: h.shares * h.price * (m - b)}; };
+const sum = list => { const t = {cost:0, val:0, div:0, day:0, px:0, cur:0}; list.forEach(h => { const c = calc(h); t.cost += c.cost; t.val += c.val; t.day += c.day; t.px += c.px; t.cur += c.cur; t.div += h.shares * h.div * (h.mkt === "US" ? fx : 1); }); t.pl = t.val - t.cost; t.pct = t.cost ? t.pl / t.cost * 100 : 0; return t; };
 const pill = p => `<span class="pill ${p >= 0 ? "up" : "down"}">${p >= 0 ? "▲" : "▼"} ${Math.abs(p).toFixed(2)}%</span>`;
 const kinds = {stock:{title:"Stock Holdings", sub:"PH Stocks", all:"All Stocks", icon:"₱"}, fund:{title:"Fund Portfolio", sub:"PH Mutual Funds / UITFs", all:"All Funds", icon:"₱"}, us:{title:"US Stocks", sub:"NASDAQ / NYSE, converted to ₱", all:"All US Stocks", icon:"$"}};
 const g = h => h.kind === "fund" ? "fund" : h.mkt === "US" ? "us" : "stock", cs = h => h.mkt === "US" ? "$" : "";
@@ -133,7 +134,7 @@ function home(){
   const leg = G.map(([k, s], i) => `<div><i style="background:${cols[i]}"></i>${kinds[k].title.replace(" Holdings", "").replace(" Portfolio", "s")}<b style="color:${cols[i]}">${t.val ? (s.val / t.val * 100).toFixed(0) : 0}%</b></div>`).join("");
   return `<div class="top"><h1>My portfolio</h1><button class="btn soft" data-refresh>↻ Refresh</button></div>${statusLine()}${tabs("home")}
   <div class="hero"><div><small>Portfolio value</small><div class="big">${money(t.val)}</div><small>Today ${signed(t.day)}${items.some(h => h.mkt === "US") ? " · $1 = ₱" + fx.toFixed(2) : ""}</small></div></div>
-  <div class="card row2"><div><div class="lbl">Invested</div><div class="val">${money(t.cost)}</div></div><div><div class="lbl">Total return</div><div class="val ${t.pl >= 0 ? "up" : "down"}">${signed(t.pl)}</div>${pill(t.pct)}</div></div>
+  <div class="card row2"><div><div class="lbl">Invested</div><div class="val">${money(t.cost)}</div></div><div><div class="lbl">Total return</div><div class="val ${t.pl >= 0 ? "up" : "down"}">${signed(t.pl)}</div>${pill(t.pct)}${t.cur ? `<div class="lbl" style="font-size:12px;margin-top:4px">of which FX ${signed(t.cur)}</div>` : ""}</div></div>
   <div class="card"><h2>Portfolio mix</h2><div class="lbl">How your investments are allocated</div>
     <div class="mix"><div class="pie" style="background:conic-gradient(${stops})"></div><div class="leg">${leg}</div></div></div>
   <div class="sechead"><div><h2>Accounts</h2><div class="lbl">All balances in one view</div></div><button class="btn" data-add="stock">+ Add</button></div>
@@ -153,13 +154,14 @@ function account(k){
     <button class="hrow" data-open="${h.id}" aria-expanded="${openId === h.id}">
       <div class="who"><div class="logo">${esc(h.ticker.slice(0,2))}</div><div style="min-width:0"><div class="tk">${esc(h.ticker)}</div><div class="nm">${esc(h.name)}</div></div></div>
       <div class="mid">${cs(h)}${num(h.avg)}<small>${num(h.shares)}</small></div>
-      <div class="pl ${c.pl >= 0 ? "up" : "down"}">${signed(c.pl)}<br>${pill(c.pct)}</div>
+      <div class="pl ${c.pl >= 0 ? "up" : "down"}">${signed(c.pl)}<br>${pill(c.pct)}${h.mkt === "US" ? `<small class="lbl" style="display:block;font-size:12px;margin-top:2px">price ${signed(c.px)} · FX ${signed(c.cur)}</small>` : ""}</div>
       <span class="chev">⌄</span></button>
     <div class="edit">
       <div><label>Shares or units</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.shares}" data-id="${h.id}" data-f="shares"></div>
       <div><label>Average price</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.avg}" data-id="${h.id}" data-f="avg"></div>
       <div><label>Price now</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.price}" data-id="${h.id}" data-f="price"></div>
       <div><label>Dividend per share a year</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.div}" data-id="${h.id}" data-f="div"></div>
+      ${h.mkt === "US" ? `<div><label>Rate bought at (₱ per $)</label><input type="number" step="any" min="0" inputmode="decimal" placeholder="${fx.toFixed(2)}" value="${h.bfx || ""}" data-id="${h.id}" data-f="bfx"></div>` : ""}
       <button class="del" data-del="${h.id}">Remove ${esc(h.ticker)}</button>
     </div></div>`; }).join("") : `<div class="empty">Nothing here yet. Tap + to add your first holding.</div>`;
   return `<div class="top"><a class="back" href="#home" aria-label="Back to portfolio">←</a><h1>${kinds[k].title}</h1><button class="btn soft" data-refresh aria-label="Refresh prices">↻</button></div>${statusLine()}
@@ -179,20 +181,20 @@ function dash(r){
   const chips = [["all","All"],["stock","PH Stocks"],["fund","Funds"],["us","US Stocks"]].map(([k, l]) => `<a class="chip ${f === k ? "on" : ""}" href="#${k === "all" ? "home" : k}">${l}</a>`).join("");
   const rows = list.map(h => { const c = calc(h), dv = h.shares * h.div * (h.mkt === "US" ? fx : 1), o = openId === h.id; return `<div class="hold ${o ? "open" : ""}"><button class="hrow trow" data-open="${h.id}" aria-expanded="${o}">
     <div class="who"><div class="logo">${esc(h.ticker.slice(0, 2))}</div><div style="min-width:0"><div class="tk">${esc(h.ticker)}</div><div class="nm">${esc(h.name)}</div></div></div>
-    <div>${cs(h)}${num(h.price)}${h.chg != null ? `<small class="${h.chg >= 0 ? "up" : "down"}">${h.chg >= 0 ? "▲" : "▼"} ${Math.abs(h.chg).toFixed(2)}% today</small>` : ""}</div>
+    <div>${cs(h)}${px(h.price)}${h.chg != null ? `<small class="${h.chg >= 0 ? "up" : "down"}">${h.chg >= 0 ? "▲" : "▼"} ${Math.abs(h.chg).toFixed(2)}% today</small>` : ""}</div>
     <div>${cs(h)}${num(h.avg)}</div><div>${num(h.shares)}</div><div>${money(c.val)}</div><div>${money(c.cost)}</div>
-    <div class="${c.pl >= 0 ? "up" : "down"}">${signed(c.pl)}<br>${pill(c.pct)}</div><div>${money(dv)}<small>per year</small></div></button>
-    <div class="edit wide">${["shares:Shares or units","avg:Average price","price:Price now","div:Dividend per share a year"].map(x => { const [k, l] = x.split(":"); return `<div><label>${l}</label><input type="number" step="any" min="0" inputmode="decimal" value="${h[k]}" data-id="${h.id}" data-f="${k}"></div>`; }).join("")}<button class="del" style="grid-column:auto" data-del="${h.id}">Remove ${esc(h.ticker)}</button></div></div>`; }).join("") || `<div class="empty">Nothing here yet. Use + Add to enter your first holding.</div>`;
+    <div class="${c.pl >= 0 ? "up" : "down"}">${signed(c.pl)}<br>${pill(c.pct)}${h.mkt === "US" ? `<small>price ${signed(c.px)} · FX ${signed(c.cur)}</small>` : ""}</div><div>${money(dv)}<small>per year</small></div></button>
+    <div class="edit wide">${["shares:Shares or units","avg:Average price","price:Price now","div:Dividend per share a year"].concat(h.mkt === "US" ? ["bfx:Rate bought at (₱ per $)"] : []).map(x => { const [k, l] = x.split(":"); return `<div><label>${l}</label><input type="number" step="any" min="0" inputmode="decimal" placeholder="${k === "bfx" ? fx.toFixed(2) : ""}" value="${h[k] ?? ""}" data-id="${h.id}" data-f="${k}"></div>`; }).join("")}<button class="del" style="grid-column:auto" data-del="${h.id}">Remove ${esc(h.ticker)}</button></div></div>`; }).join("") || `<div class="empty">Nothing here yet. Use + Add to enter your first holding.</div>`;
   const al = list.map(h => [h, calc(h).val]).sort((a, b) => b[1] - a[1]); let a0 = 0;
   const stops = al.map(([h, v], i) => { const p = tv ? v / tv * 100 : 0, sg = `${pal[i % pal.length]} ${a0}% ${a0 + p}%`; a0 += p; return sg; }).join(",") || "var(--line) 0 100%";
   const top = al[0], topP = top && tv ? top[1] / tv * 100 : 0;
   const leg = al.map(([h, v], i) => `<div><i style="background:${pal[i % pal.length]}"></i>${esc(h.ticker)}<b>${tv ? (v / tv * 100).toFixed(1) : "0.0"}%</b></div>`).join("");
   const wl = watchl.slice(0, 6).map(w => { const q = wq[w.m + ":" + w.t] || {}; return `<div><i style="background:var(--line)"></i>${esc(w.t)}<b>${q.price ? (w.m === "US" ? "$" : "₱") + num(q.price) : "–"}${q.chg != null ? " " + (q.chg >= 0 ? "▲" : "▼") + Math.abs(q.chg).toFixed(1) + "%" : ""}</b></div>`; }).join("") || `<div class="lbl">Nothing followed yet.</div>`;
   return `<div class="dtop"><h1>My portfolio</h1>${tabs("home")}<span class="grow"></span><span class="lbl">${esc(status)}</span><button class="btn soft" data-refresh>↻ Refresh</button></div>
-  <div class="stats">${stat("₱", "Total Portfolio Value", money(all.val))}${stat("↗", "All Time Profit", signed(all.pl), pill(all.pct))}${stat("◔", "Day Change", signed(all.day), pill(dayPct))}${stat("%", "Est. Dividend on Cost", money(all.div) + '<span class="lbl">/yr</span>', `<span class="pill neutral">${yld.toFixed(2)}% annual</span>`)}</div>
+  <div class="stats">${stat("₱", "Total Portfolio Value", money(all.val))}${stat("↗", "All Time Profit", signed(all.pl), pill(all.pct) + (all.cur ? `<span class="lbl" style="font-size:12px;width:100%">of which FX ${signed(all.cur)}</span>` : ""))}${stat("◔", "Day Change", signed(all.day), pill(dayPct))}${stat("%", "Est. Dividend on Cost", money(all.div) + '<span class="lbl">/yr</span>', `<span class="pill neutral">${yld.toFixed(2)}% annual</span>`)}</div>
   <div class="dgrid"><div><div class="chips">${chips}<span class="grow"></span><button class="btn" data-add="${f === "all" ? "stock" : f}">+ Add</button></div>
   <div class="thead"><span>Holding</span><span>Last price</span><span>Avg. price</span><span>Shares</span><span>Market value</span><span>Total cost</span><span>Total profit/loss</span><span>Div. income</span></div>${rows}
-  <p class="note">US holdings are entered in dollars and shown in pesos at ${fx.toFixed(2)} per dollar. Click a holding to edit it.</p></div>
+  <p class="note">US holdings are entered in dollars and shown in pesos at ${fx.toFixed(2)} per dollar. Cost uses the rate you bought at, so currency moves show up in your profit. Click a holding to edit it.</p></div>
   <aside><div class="card" style="margin-top:0"><h2>Portfolio Allocation</h2><div class="donut" style="background:conic-gradient(${stops})"><div class="dc"><b style="font-size:26px">${topP.toFixed(1)}%</b><span class="lbl">${top ? esc(top[0].ticker) : ""}</span></div></div><div class="dleg">${leg}</div></div>
   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:18px">Watchlist</h2><a class="lbl" href="#watch">Open →</a></div><div class="dleg">${wl}</div></div></aside></div>`;
 }
@@ -207,7 +209,7 @@ window.addEventListener("hashchange", () => { openId = null; render(); window.sc
 
 $("app").addEventListener("click", e => {
   const a = e.target.closest("[data-add]"), o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
-  if (a){ $("fKind").value = a.dataset.add === "fund" ? "fund" : "stock"; $("fMkt").value = a.dataset.add === "us" ? "US" : "PH"; ["fTicker","fName","fShares","fAvg","fPrice","fDiv"].forEach(i => $(i).value = ""); $("sheet").classList.add("open"); $("fTicker").focus(); }
+  if (a){ $("fKind").value = a.dataset.add === "fund" ? "fund" : "stock"; $("fMkt").value = a.dataset.add === "us" ? "US" : "PH"; ["fTicker","fName","fShares","fAvg","fPrice","fDiv"].forEach(i => $(i).value = ""); $("fBfx").value = ""; syncMkt(); $("sheet").classList.add("open"); $("fTicker").focus(); }
   if (o){ openId = openId == o.dataset.open ? null : +o.dataset.open; render(); }
   if (d){ const h = items.find(x => x.id == d.dataset.del); if (confirm("Remove " + h.ticker + " from your portfolio?")){ items = items.filter(x => x.id != h.id); openId = null; save(); render(); } }
 });
@@ -217,12 +219,14 @@ $("app").addEventListener("change", e => {
   if (!isNaN(n) && n >= 0){ h[e.target.dataset.f] = n; save(); }
   render();
 });
+const syncMkt = () => { const us = $("fMkt").value === "US" && $("fKind").value !== "fund", c = us ? "$" : "₱"; $("fBfxW").style.display = us ? "block" : "none"; document.querySelector('label[for="fAvg"]').textContent = `Average price (${c})`; document.querySelector('label[for="fPrice"]').textContent = `Price now (${c}, optional)`; document.querySelector('label[for="fDiv"]').textContent = `Dividend per share a year (${c})`; };
+$("fMkt").onchange = syncMkt; $("fKind").onchange = syncMkt;
 $("cancel").onclick = () => $("sheet").classList.remove("open");
 $("save").onclick = () => {
   const ticker = $("fTicker").value.trim().toUpperCase(), shares = parseFloat($("fShares").value), avg = parseFloat($("fAvg").value);
   if (!ticker || isNaN(shares) || isNaN(avg)){ $("fTicker").focus(); return; }
   const price = parseFloat($("fPrice").value);
-  items.push({id:Date.now(), kind:$("fKind").value, mkt:$("fKind").value === "fund" ? "PH" : $("fMkt").value, ticker, name:$("fName").value.trim() || ticker, shares, avg, price:isNaN(price) ? avg : price, div:parseFloat($("fDiv").value) || 0});
+  items.push({id:Date.now(), kind:$("fKind").value, mkt:$("fKind").value === "fund" ? "PH" : $("fMkt").value, ticker, name:$("fName").value.trim() || ticker, shares, avg, price:isNaN(price) ? avg : price, div:parseFloat($("fDiv").value) || 0, bfx:($("fKind").value !== "fund" && $("fMkt").value === "US") ? (parseFloat($("fBfx").value) || fx) : undefined});
   save(); $("sheet").classList.remove("open"); location.hash = g(items[items.length - 1]); render();
 };
 let status = "Prices are manual until live prices load.", timer = null;
