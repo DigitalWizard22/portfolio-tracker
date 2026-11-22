@@ -80,6 +80,7 @@ input,select{width:100%;background:var(--chip);border:1px solid var(--line);bord
 .hold .edit.wide{grid-template-columns:repeat(5,1fr);align-items:end;padding:6px 18px 18px}
 .donut{width:200px;height:200px;border-radius:50%;margin:12px auto 0;position:relative}.donut::after{content:"";position:absolute;inset:26px;border-radius:50%;background:var(--card)}.dc{position:absolute;inset:0;display:grid;place-content:center;text-align:center;z-index:1}
 .dleg{display:grid;gap:10px;margin-top:16px;font-size:14px}.dleg div{display:flex;align-items:center;gap:8px}.dleg i{width:10px;height:10px;border-radius:50%;flex:none}.dleg b{margin-left:auto}
+.tools{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}.txp{grid-column:1/-1}.txl{display:grid;gap:4px;margin-top:10px;font-size:13px;color:var(--mut)}.txl div{display:flex;align-items:center;justify-content:space-between}.txl .x{min-height:28px;padding:2px 8px}
 .sheet{position:fixed;inset:0;background:rgba(5,8,15,.6);display:none;align-items:flex-end;justify-content:center;z-index:20}
 .sheet.open{display:flex}
 .sheet .in{background:var(--card);width:100%;max-width:480px;border-radius:26px 26px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:92vh;overflow:auto}
@@ -103,6 +104,16 @@ input,select{width:100%;background:var(--chip);border:1px solid var(--line);bord
   <div class="full" id="fBfxW" style="display:none"><label for="fBfx">Rate you bought at (₱ per $)</label><input id="fBfx" type="number" step="any" min="0" inputmode="decimal" placeholder="Leave blank to use today’s rate"></div>
   <div class="acts"><button class="btn soft" id="cancel">Cancel</button><button class="btn" id="save">Save holding</button></div>
 </div></div>
+<div class="sheet" id="tsheet"><div class="in">
+  <h3 id="tTitle">Log transaction</h3>
+  <div><label for="tType">Type</label><select id="tType"><option value="buy">Buy</option><option value="sell">Sell</option></select></div>
+  <div><label for="tDate">Date</label><input id="tDate" type="date"></div>
+  <div><label for="tShares">Shares or units</label><input id="tShares" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div><label for="tPrice" id="tPriceL">Price per share</label><input id="tPrice" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div class="full" id="tRateW" style="display:none"><label for="tRate">Exchange rate (₱ per $), blank = today’s</label><input id="tRate" type="number" step="any" min="0" inputmode="decimal"></div>
+  <div class="acts"><button class="btn soft" id="tCancel">Cancel</button><button class="btn" id="tSave">Save</button></div>
+</div></div>
+<input type="file" id="impFile" accept="application/json,.json" hidden>
 <script>
 const KEY = "portfolio-v2";
 const seed = [
@@ -110,8 +121,10 @@ const seed = [
   {id:2, kind:"stock", ticker:"RCR", name:"RL Commercial REIT", shares:100, avg:5.9979, price:5.95, div:0.4584},
   {id:3, kind:"fund", ticker:"ATRGTEC", name:"ATRAM Global Technology Feeder Fund", shares:2, avg:522.2, price:494.005, div:0}
 ];
-let items = load(), openId = null, fx = 58, watchl = [], wq = {};
-try { fx = +localStorage.getItem("portfolio-fx") || 58; watchl = JSON.parse(localStorage.getItem("portfolio-watch")) || []; } catch(e){}
+let items = load(), openId = null, fx = 58, watchl = [], wq = {}, txs = [], hist = [];
+try { fx = +localStorage.getItem("portfolio-fx") || 58; watchl = JSON.parse(localStorage.getItem("portfolio-watch")) || []; txs = JSON.parse(localStorage.getItem("portfolio-tx")) || []; hist = JSON.parse(localStorage.getItem("portfolio-hist")) || []; } catch(e){}
+items.forEach(applyTx);
+const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
 const saveW = () => { try { localStorage.setItem("portfolio-watch", JSON.stringify(watchl)); } catch(e){} };
 function load(){ try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch(e){} return seed.map(x => ({...x})); }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){} }
@@ -121,11 +134,48 @@ const signed = n => (n > 0 ? "+" : "") + (n < 0 ? "-" : "") + Math.abs(n).toLoca
 const num = n => String(+(+n).toFixed(4)), px = n => String(+(+n).toFixed(n >= 100 ? 2 : 4));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const calc = h => { const us = h.mkt === "US", m = us ? fx : 1, b = us ? (h.bfx || fx) : 1, cost = h.shares * h.avg * b, val = h.shares * h.price * m; return {cost, val, pl:val - cost, pct:cost ? (val - cost) / cost * 100 : 0, day: h.chg ? val - val / (1 + h.chg / 100) : 0, px: h.shares * (h.price - h.avg) * b, cur: h.shares * h.price * (m - b)}; };
-const sum = list => { const t = {cost:0, val:0, div:0, day:0, px:0, cur:0}; list.forEach(h => { const c = calc(h); t.cost += c.cost; t.val += c.val; t.day += c.day; t.px += c.px; t.cur += c.cur; t.div += h.shares * h.div * (h.mkt === "US" ? fx : 1); }); t.pl = t.val - t.cost; t.pct = t.cost ? t.pl / t.cost * 100 : 0; return t; };
+const sum = list => { const t = {cost:0, val:0, div:0, day:0, px:0, cur:0, real:0}; list.forEach(h => { const c = calc(h); t.real += h.realized || 0; t.cost += c.cost; t.val += c.val; t.day += c.day; t.px += c.px; t.cur += c.cur; t.div += h.shares * h.div * (h.mkt === "US" ? fx : 1); }); t.pl = t.val - t.cost; t.pct = t.cost ? t.pl / t.cost * 100 : 0; return t; };
 const pill = p => `<span class="pill ${p >= 0 ? "up" : "down"}">${p >= 0 ? "▲" : "▼"} ${Math.abs(p).toFixed(2)}%</span>`;
 const kinds = {stock:{title:"Stock Holdings", sub:"PH Stocks", all:"All Stocks", icon:"₱"}, fund:{title:"Fund Portfolio", sub:"PH Mutual Funds / UITFs", all:"All Funds", icon:"₱"}, us:{title:"US Stocks", sub:"NASDAQ / NYSE, converted to ₱", all:"All US Stocks", icon:"$"}};
 const g = h => h.kind === "fund" ? "fund" : h.mkt === "US" ? "us" : "stock", cs = h => h.mkt === "US" ? "$" : "";
 
+const KEYS = ["portfolio-v2","portfolio-watch","portfolio-fx","portfolio-tx","portfolio-hist"];
+const hasTx = h => txs.some(t => t.hid === h.id);
+function applyTx(h){ // weighted-average cost from the transaction log
+  const L = txs.filter(t => t.hid === h.id).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id);
+  if (!L.length) return;
+  const us = h.mkt === "US"; let sh = 0, cn = 0, cp = 0, real = 0;
+  L.forEach(t => { const r = us ? (t.rate || fx) : 1;
+    if (t.type === "buy"){ sh += t.shares; cn += t.shares * t.price; cp += t.shares * t.price * r; }
+    else { const q = Math.min(t.shares, sh), f = sh ? q / sh : 0; real += q * t.price * r - cp * f; cn -= cn * f; cp -= cp * f; sh -= q; } });
+  h.shares = +sh.toFixed(8); if (sh) h.avg = cn / sh; if (us && cn) h.bfx = cp / cn; h.realized = real;
+}
+const txPanel = h => { const L = txs.filter(t => t.hid === h.id).sort((a, b) => a.date < b.date ? 1 : -1); return `<div class="txp"><button class="btn soft" data-tx="${h.id}" style="min-height:40px">+ Log buy / sell</button>${L.length ? `<div class="txl">${L.map(t => `<div><span>${t.date === "0000-00-00" ? "Opening" : t.date} · ${t.type === "buy" ? "Buy" : "Sell"} ${num(t.shares)} @ ${h.mkt === "US" ? "$" : "₱"}${num(t.price)}${t.rate ? " (₱" + num(t.rate) + ")" : ""}</span><button class="x" data-txdel="${t.id}" aria-label="Delete transaction">✕</button></div>`).join("")}</div><div class="lbl" style="font-size:12px;margin-top:6px">Shares, average price and purchase rate come from these.${h.realized ? " Realized " + signed(h.realized) + "." : ""}</div>` : ""}</div>`; };
+const tools = () => `<div class="tools"><button class="btn soft" data-export>⬇ Export backup</button><button class="btn soft" data-import>⬆ Import backup</button></div>`;
+function perf(){
+  const H = hist;
+  if (H.length < 2) return `<div class="card"><h2 style="font-size:18px">Performance</h2><div class="lbl" style="margin-top:6px">History starts building today. Open the app on a few different days and your chart against the PSEi and S&amp;P 500 appears here.</div></div>`;
+  let idx = 100; const me = H.map((s, i) => { if (i){ const p = H[i - 1]; idx *= p.v ? (s.v - (s.c - p.c)) / p.v : 1; } return idx; });
+  const rb = k => { const f = H.find(s => s[k]); return H.map(s => f && s[k] ? s[k] / f[k] * 100 : null); };
+  const L = [["You", me, "var(--sky)"], ["PSEi", rb("p"), "var(--c3)"], ["S&amp;P 500", rb("s"), "#E0A526"]];
+  const vals = L.flatMap(([, a]) => a).filter(v => v != null), lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * .1 || 1, y0 = lo - pad, y1 = hi + pad, W = 300, Ht = 140;
+  const X = i => i / (H.length - 1) * W, Y = v => Ht - (v - y0) / (y1 - y0) * Ht;
+  const lines = L.map(([n, a, c]) => { const pts = a.map((v, i) => v == null ? null : X(i).toFixed(1) + "," + Y(v).toFixed(1)).filter(Boolean); return pts.length > 1 ? `<polyline fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" points="${pts.join(" ")}"/>` : ""; }).join("");
+  const leg = L.map(([n, a, c]) => { const last = [...a].reverse().find(v => v != null); return last == null ? "" : `<div><i style="background:${c}"></i>${n}<b class="${last >= 100 ? "up" : "down"}">${last >= 100 ? "+" : ""}${(last - 100).toFixed(2)}%</b></div>`; }).join("");
+  return `<div class="card"><h2 style="font-size:18px">Performance</h2><svg viewBox="0 0 ${W} ${Ht}" width="100%" role="img" aria-label="Portfolio performance compared with the PSEi and S&amp;P 500" style="margin-top:12px;overflow:visible"><line x1="0" x2="${W}" y1="${Y(100).toFixed(1)}" y2="${Y(100).toFixed(1)}" stroke="var(--line)" stroke-dasharray="3 3"/>${lines}</svg><div class="lbl" style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px"><span>${H[0].d}</span><span>${H[H.length - 1].d}</span></div><div class="dleg">${leg}</div></div>`;
+}
+function exportData(){
+  save(); saveW(); store("portfolio-tx", txs); store("portfolio-hist", hist);
+  const o = {app:"portfolio-tracker", v:1, at:new Date().toISOString()}; KEYS.forEach(k => { try { o[k] = localStorage.getItem(k); } catch(e){} });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(o, null, 1)], {type:"application/json"})); a.download = "portfolio-backup-" + new Date().toLocaleDateString("en-CA") + ".json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  status = "Backup downloaded."; render();
+}
+let tHid = null;
+function openTx(id){
+  tHid = id; const h = items.find(x => x.id == id), us = h.mkt === "US";
+  $("tTitle").textContent = "Log transaction · " + h.ticker; $("tPriceL").textContent = "Price per share (" + (us ? "$" : "₱") + ")"; $("tRateW").style.display = us ? "block" : "none";
+  $("tType").value = "buy"; $("tDate").value = new Date().toLocaleDateString("en-CA"); $("tShares").value = ""; $("tPrice").value = ""; $("tRate").value = ""; $("tsheet").classList.add("open"); $("tShares").focus();
+}
 const tabs = a => `<div class="tabs"><a class="${a === "home" ? "on" : ""}" href="#home">Portfolio</a><a class="${a === "watch" ? "on" : ""}" href="#watch">Watchlist</a></div>`;
 function home(){
   const t = sum(items), G = ["stock","fund","us"].map(k => [k, sum(items.filter(h => g(h) === k))]), cols = ["var(--blue)","var(--teal)","var(--c3)"];
@@ -134,12 +184,13 @@ function home(){
   const leg = G.map(([k, s], i) => `<div><i style="background:${cols[i]}"></i>${kinds[k].title.replace(" Holdings", "").replace(" Portfolio", "s")}<b style="color:${cols[i]}">${t.val ? (s.val / t.val * 100).toFixed(0) : 0}%</b></div>`).join("");
   return `<div class="top"><h1>My portfolio</h1><button class="btn soft" data-refresh>↻ Refresh</button></div>${statusLine()}${tabs("home")}
   <div class="hero"><div><small>Portfolio value</small><div class="big">${money(t.val)}</div><small>Today ${signed(t.day)}${items.some(h => h.mkt === "US") ? " · $1 = ₱" + fx.toFixed(2) : ""}</small></div></div>
-  <div class="card row2"><div><div class="lbl">Invested</div><div class="val">${money(t.cost)}</div></div><div><div class="lbl">Total return</div><div class="val ${t.pl >= 0 ? "up" : "down"}">${signed(t.pl)}</div>${pill(t.pct)}${t.cur ? `<div class="lbl" style="font-size:12px;margin-top:4px">of which FX ${signed(t.cur)}</div>` : ""}</div></div>
+  <div class="card row2"><div><div class="lbl">Invested</div><div class="val">${money(t.cost)}</div></div><div><div class="lbl">Total return</div><div class="val ${t.pl >= 0 ? "up" : "down"}">${signed(t.pl)}</div>${pill(t.pct)}${t.cur ? `<div class="lbl" style="font-size:12px;margin-top:4px">of which FX ${signed(t.cur)}</div>` : ""}${t.real ? `<div class="lbl" style="font-size:12px;margin-top:2px">realized ${signed(t.real)}</div>` : ""}</div></div>
   <div class="card"><h2>Portfolio mix</h2><div class="lbl">How your investments are allocated</div>
     <div class="mix"><div class="pie" style="background:conic-gradient(${stops})"></div><div class="leg">${leg}</div></div></div>
+  ${perf()}
   <div class="sechead"><div><h2>Accounts</h2><div class="lbl">All balances in one view</div></div><button class="btn" data-add="stock">+ Add</button></div>
   ${G.map(acct).join("")}
-  <p class="note">US holdings are entered in dollars and converted at the live USD to PHP rate. Open an account and tap a holding to edit it. Data is saved in this browser only.</p>`;
+  <p class="note">US holdings are entered in dollars and converted at the live USD to PHP rate. Open an account and tap a holding to edit it. Data is saved in this browser only.</p>${tools()}`;
 }
 
 function watch(){
@@ -157,11 +208,12 @@ function account(k){
       <div class="pl ${c.pl >= 0 ? "up" : "down"}">${signed(c.pl)}<br>${pill(c.pct)}${h.mkt === "US" ? `<small class="lbl" style="display:block;font-size:12px;margin-top:2px">price ${signed(c.px)} · FX ${signed(c.cur)}</small>` : ""}</div>
       <span class="chev">⌄</span></button>
     <div class="edit">
-      <div><label>Shares or units</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.shares}" data-id="${h.id}" data-f="shares"></div>
-      <div><label>Average price</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.avg}" data-id="${h.id}" data-f="avg"></div>
+      ${hasTx(h) ? "" : `<div><label>Shares or units</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.shares}" data-id="${h.id}" data-f="shares"></div>
+      <div><label>Average price</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.avg}" data-id="${h.id}" data-f="avg"></div>`}
       <div><label>Price now</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.price}" data-id="${h.id}" data-f="price"></div>
       <div><label>Dividend per share a year</label><input type="number" step="any" min="0" inputmode="decimal" value="${h.div}" data-id="${h.id}" data-f="div"></div>
-      ${h.mkt === "US" ? `<div><label>Rate bought at (₱ per $)</label><input type="number" step="any" min="0" inputmode="decimal" placeholder="${fx.toFixed(2)}" value="${h.bfx || ""}" data-id="${h.id}" data-f="bfx"></div>` : ""}
+      ${h.mkt === "US" && !hasTx(h) ? `<div><label>Rate bought at (₱ per $)</label><input type="number" step="any" min="0" inputmode="decimal" placeholder="${fx.toFixed(2)}" value="${h.bfx || ""}" data-id="${h.id}" data-f="bfx"></div>` : ""}
+      ${txPanel(h)}
       <button class="del" data-del="${h.id}">Remove ${esc(h.ticker)}</button>
     </div></div>`; }).join("") : `<div class="empty">Nothing here yet. Tap + to add your first holding.</div>`;
   return `<div class="top"><a class="back" href="#home" aria-label="Back to portfolio">←</a><h1>${kinds[k].title}</h1><button class="btn soft" data-refresh aria-label="Refresh prices">↻</button></div>${statusLine()}
@@ -184,18 +236,18 @@ function dash(r){
     <div>${cs(h)}${px(h.price)}${h.chg != null ? `<small class="${h.chg >= 0 ? "up" : "down"}">${h.chg >= 0 ? "▲" : "▼"} ${Math.abs(h.chg).toFixed(2)}% today</small>` : ""}</div>
     <div>${cs(h)}${num(h.avg)}</div><div>${num(h.shares)}</div><div>${money(c.val)}</div><div>${money(c.cost)}</div>
     <div class="${c.pl >= 0 ? "up" : "down"}">${signed(c.pl)}<br>${pill(c.pct)}${h.mkt === "US" ? `<small>price ${signed(c.px)} · FX ${signed(c.cur)}</small>` : ""}</div><div>${money(dv)}<small>per year</small></div></button>
-    <div class="edit wide">${["shares:Shares or units","avg:Average price","price:Price now","div:Dividend per share a year"].concat(h.mkt === "US" ? ["bfx:Rate bought at (₱ per $)"] : []).map(x => { const [k, l] = x.split(":"); return `<div><label>${l}</label><input type="number" step="any" min="0" inputmode="decimal" placeholder="${k === "bfx" ? fx.toFixed(2) : ""}" value="${h[k] ?? ""}" data-id="${h.id}" data-f="${k}"></div>`; }).join("")}<button class="del" style="grid-column:auto" data-del="${h.id}">Remove ${esc(h.ticker)}</button></div></div>`; }).join("") || `<div class="empty">Nothing here yet. Use + Add to enter your first holding.</div>`;
+    <div class="edit wide">${(hasTx(h) ? [] : ["shares:Shares or units","avg:Average price"]).concat(["price:Price now","div:Dividend per share a year"], h.mkt === "US" && !hasTx(h) ? ["bfx:Rate bought at (₱ per $)"] : []).map(x => { const [k, l] = x.split(":"); return `<div><label>${l}</label><input type="number" step="any" min="0" inputmode="decimal" placeholder="${k === "bfx" ? fx.toFixed(2) : ""}" value="${h[k] ?? ""}" data-id="${h.id}" data-f="${k}"></div>`; }).join("")}${txPanel(h)}<button class="del" style="grid-column:auto" data-del="${h.id}">Remove ${esc(h.ticker)}</button></div></div>`; }).join("") || `<div class="empty">Nothing here yet. Use + Add to enter your first holding.</div>`;
   const al = list.map(h => [h, calc(h).val]).sort((a, b) => b[1] - a[1]); let a0 = 0;
   const stops = al.map(([h, v], i) => { const p = tv ? v / tv * 100 : 0, sg = `${pal[i % pal.length]} ${a0}% ${a0 + p}%`; a0 += p; return sg; }).join(",") || "var(--line) 0 100%";
   const top = al[0], topP = top && tv ? top[1] / tv * 100 : 0;
   const leg = al.map(([h, v], i) => `<div><i style="background:${pal[i % pal.length]}"></i>${esc(h.ticker)}<b>${tv ? (v / tv * 100).toFixed(1) : "0.0"}%</b></div>`).join("");
   const wl = watchl.slice(0, 6).map(w => { const q = wq[w.m + ":" + w.t] || {}; return `<div><i style="background:var(--line)"></i>${esc(w.t)}<b>${q.price ? (w.m === "US" ? "$" : "₱") + num(q.price) : "–"}${q.chg != null ? " " + (q.chg >= 0 ? "▲" : "▼") + Math.abs(q.chg).toFixed(1) + "%" : ""}</b></div>`; }).join("") || `<div class="lbl">Nothing followed yet.</div>`;
   return `<div class="dtop"><h1>My portfolio</h1>${tabs("home")}<span class="grow"></span><span class="lbl">${esc(status)}</span><button class="btn soft" data-refresh>↻ Refresh</button></div>
-  <div class="stats">${stat("₱", "Total Portfolio Value", money(all.val))}${stat("↗", "All Time Profit", signed(all.pl), pill(all.pct) + (all.cur ? `<span class="lbl" style="font-size:12px;width:100%">of which FX ${signed(all.cur)}</span>` : ""))}${stat("◔", "Day Change", signed(all.day), pill(dayPct))}${stat("%", "Est. Dividend on Cost", money(all.div) + '<span class="lbl">/yr</span>', `<span class="pill neutral">${yld.toFixed(2)}% annual</span>`)}</div>
+  <div class="stats">${stat("₱", "Total Portfolio Value", money(all.val))}${stat("↗", "All Time Profit", signed(all.pl), pill(all.pct) + (all.cur ? `<span class="lbl" style="font-size:12px;width:100%">of which FX ${signed(all.cur)}</span>` : "") + (all.real ? `<span class="lbl" style="font-size:12px;width:100%">realized ${signed(all.real)}</span>` : ""))}${stat("◔", "Day Change", signed(all.day), pill(dayPct))}${stat("%", "Est. Dividend on Cost", money(all.div) + '<span class="lbl">/yr</span>', `<span class="pill neutral">${yld.toFixed(2)}% annual</span>`)}</div>
   <div class="dgrid"><div><div class="chips">${chips}<span class="grow"></span><button class="btn" data-add="${f === "all" ? "stock" : f}">+ Add</button></div>
   <div class="thead"><span>Holding</span><span>Last price</span><span>Avg. price</span><span>Shares</span><span>Market value</span><span>Total cost</span><span>Total profit/loss</span><span>Div. income</span></div>${rows}
-  <p class="note">US holdings are entered in dollars and shown in pesos at ${fx.toFixed(2)} per dollar. Cost uses the rate you bought at, so currency moves show up in your profit. Click a holding to edit it.</p></div>
-  <aside><div class="card" style="margin-top:0"><h2>Portfolio Allocation</h2><div class="donut" style="background:conic-gradient(${stops})"><div class="dc"><b style="font-size:26px">${topP.toFixed(1)}%</b><span class="lbl">${top ? esc(top[0].ticker) : ""}</span></div></div><div class="dleg">${leg}</div></div>
+  <p class="note">US holdings are entered in dollars and shown in pesos at ${fx.toFixed(2)} per dollar. Cost uses the rate you bought at, so currency moves show up in your profit. Click a holding to edit it.</p>${tools()}</div>
+  <aside>${perf().replace('class="card"', 'class="card" style="margin-top:0"')}<div class="card"><h2>Portfolio Allocation</h2><div class="donut" style="background:conic-gradient(${stops})"><div class="dc"><b style="font-size:26px">${topP.toFixed(1)}%</b><span class="lbl">${top ? esc(top[0].ticker) : ""}</span></div></div><div class="dleg">${leg}</div></div>
   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:18px">Watchlist</h2><a class="lbl" href="#watch">Open →</a></div><div class="dleg">${wl}</div></div></aside></div>`;
 }
 
@@ -241,6 +293,13 @@ async function refresh(manual){
     items.forEach(h => { const k = key(h); if (good(k)){ h.price = q[k].price; if (q[k].chg != null) h.chg = q[k].chg; } });
     watchl.forEach(w => { wq[w.m + ":" + w.t] = q[w.m + ":" + w.t] || {}; });
     save();
+    const tot = sum(items);
+    if (tot.val > 0){
+      const day = new Date().toLocaleDateString("en-CA"), b = d.bench || {}, ex = hist.find(x => x.d === day), snap = {d:day, v:Math.round(tot.val * 100) / 100, c:Math.round(tot.cost * 100) / 100, p:b.psei || (ex && ex.p), s:b.spx || (ex && ex.s)};
+      if (ex) Object.assign(ex, snap); else hist.push(snap);
+      if (hist.length > 800) hist.shift();
+      store("portfolio-hist", hist);
+    }
     const miss = items.filter(h => !good(key(h))).map(h => h.ticker);
     status = "Live prices updated " + new Date().toLocaleTimeString("en-PH", {hour:"2-digit", minute:"2-digit"}) + (miss.length ? " (no price for " + miss.join(", ") + ")" : "");
     if (!timer) timer = setInterval(() => { if (!document.hidden) refresh(false); }, 60000);
@@ -251,7 +310,28 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-wadd]")){ const t = $("wT").value.trim().toUpperCase(), m = $("wM").value; if (/^[A-Z0-9.\-]{1,10}$/.test(t) && !watchl.some(w => w.t === t && w.m === m)){ watchl.push({t, m}); saveW(); render(); refresh(false); } }
   const x = e.target.closest("[data-wdel]"); if (x){ watchl = watchl.filter(w => w.m + ":" + w.t !== x.dataset.wdel); saveW(); render(); }
 });
-document.addEventListener("click", e => { if (e.target.closest("[data-refresh]")) refresh(true); });
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-refresh]")) refresh(true);
+  if (e.target.closest("[data-export]")) exportData();
+  if (e.target.closest("[data-import]")) $("impFile").click();
+  const t = e.target.closest("[data-tx]"); if (t) openTx(t.dataset.tx);
+  const x = e.target.closest("[data-txdel]");
+  if (x){ const tx = txs.find(v => v.id == x.dataset.txdel); if (tx && confirm("Delete this transaction?")){ txs = txs.filter(v => v.id != tx.id); const h = items.find(v => v.id === tx.hid); if (h) applyTx(h); store("portfolio-tx", txs); save(); render(); } }
+});
+$("tCancel").onclick = () => $("tsheet").classList.remove("open");
+$("tSave").onclick = () => {
+  const h = items.find(x => x.id == tHid), shares = parseFloat($("tShares").value), price = parseFloat($("tPrice").value), us = h.mkt === "US";
+  if (!(shares > 0) || !(price >= 0)){ $("tShares").focus(); return; }
+  if (!hasTx(h) && h.shares > 0) txs.push({id:Date.now() - 1, hid:h.id, date:"0000-00-00", type:"buy", shares:h.shares, price:h.avg, rate:us ? (h.bfx || fx) : undefined});
+  txs.push({id:Date.now(), hid:h.id, date:$("tDate").value || new Date().toLocaleDateString("en-CA"), type:$("tType").value, shares, price, rate:us ? (parseFloat($("tRate").value) || fx) : undefined});
+  applyTx(h); store("portfolio-tx", txs); save(); $("tsheet").classList.remove("open"); render();
+};
+$("impFile").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => { const o = JSON.parse(t); if (o.app !== "portfolio-tracker" || !o["portfolio-v2"]) throw new Error("not a backup"); if (!confirm("Replace everything in this browser with this backup?")) return; KEYS.forEach(k => { if (o[k] != null) localStorage.setItem(k, o[k]); else localStorage.removeItem(k); }); location.reload(); })
+   .catch(() => { status = "That file isn’t a valid backup."; render(); });
+  e.target.value = "";
+};
 render();
 refresh(false);
 </script>

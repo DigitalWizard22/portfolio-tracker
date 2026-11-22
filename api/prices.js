@@ -65,14 +65,28 @@ async function usdphp() {
   catch (e) { return undefined; }
 }
 
+async function psei() { // PSE Edge index summary table
+  const text = stripTags(await (await get("https://edge.pse.com.ph/index/form.do")).text());
+  const m = text.match(/PSEi\s+([\d,]+\.\d+)\s+[\d,.]+\s+[\d.]+/);
+  if (!m) throw new Error("PSEi not found");
+  return num(m[1]);
+}
+async function spx() { // S&P 500 on Google Finance
+  const html = await (await get("https://www.google.com/finance/quote/.INX:INDEXSP")).text();
+  const m = html.match(/data-last-price="([\d.,]+)"/);
+  if (!m) throw new Error("S&P 500 not found");
+  return num(m[1]);
+}
+
 module.exports = async (req, res) => {
   const tokens = String(req.query.t || "").split(",").filter(x => /^(PH|US|FUND):[A-Za-z0-9.\-]{1,10}$/.test(x)).slice(0, 25);
   const quotes = {};
-  const [fx] = await Promise.all([usdphp(), ...tokens.map(async tok => {
+  const bench = {};
+  const [fx] = await Promise.all([usdphp(), psei().then(v => { bench.psei = v; }).catch(() => {}), spx().then(v => { bench.spx = v; }).catch(() => {}), ...tokens.map(async tok => {
     const [mkt, raw] = tok.split(":"), t = raw.toUpperCase();
     try { quotes[tok] = mkt === "FUND" ? await fund(t) : await stock(mkt, t); }
     catch (e) { quotes[tok] = { error: e.message }; } // one bad source must not break the rest
   })]);
   res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
-  res.status(200).json({ quotes, fx });
+  res.status(200).json({ quotes, fx, bench });
 };
