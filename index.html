@@ -144,10 +144,10 @@ const SDEF = {PH:{comm:.25, min:0, exch:.005, other:.01, vat:12, tax:.1}, US:{co
 let items = load(), openId = null, fx = 58, watchl = [], wq = {}, txs = [], hist = [], divs = [], settings = JSON.parse(JSON.stringify(SDEF));
 try { fx = +localStorage.getItem("portfolio-fx") || 58; watchl = JSON.parse(localStorage.getItem("portfolio-watch")) || []; txs = JSON.parse(localStorage.getItem("portfolio-tx")) || []; hist = JSON.parse(localStorage.getItem("portfolio-hist")) || []; divs = JSON.parse(localStorage.getItem("portfolio-div")) || []; const sv = JSON.parse(localStorage.getItem("portfolio-set")); if (sv) settings = {PH:{...SDEF.PH, ...sv.PH}, US:{...SDEF.US, ...sv.US}}; } catch(e){}
 items.forEach(applyTx);
-const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
-const saveW = () => { try { localStorage.setItem("portfolio-watch", JSON.stringify(watchl)); } catch(e){} };
+const store = (k, v, q) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} if (!q) dirty(); };
+const saveW = q => { try { localStorage.setItem("portfolio-watch", JSON.stringify(watchl)); } catch(e){} if (!q) dirty(); };
 function load(){ try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch(e){} return seed.map(x => ({...x})); }
-function save(){ try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){} }
+function save(q){ try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){} if (!q) dirty(); }
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? "-" : "") + "₱" + Math.abs(n).toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
 const signed = n => (n > 0 ? "+" : "") + (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -160,7 +160,7 @@ const kinds = {stock:{title:"Stock Holdings", sub:"PH Stocks", all:"All Stocks",
 const g = h => h.kind === "fund" ? "fund" : h.mkt === "US" ? "us" : "stock", cs = h => h.mkt === "US" ? "$" : "";
 
 const standalone = () => matchMedia("(display-mode: standalone)").matches || (typeof navigator !== "undefined" && navigator.standalone === true);
-const KEYS = ["portfolio-v2","portfolio-watch","portfolio-fx","portfolio-tx","portfolio-hist","portfolio-div","portfolio-set"];
+const KEYS = ["portfolio-v2","portfolio-watch","portfolio-fx","portfolio-tx","portfolio-hist","portfolio-div","portfolio-set"], SK = KEYS.filter(k => k !== "portfolio-fx");
 const feeOf = (mkt, type, gross) => { const c = settings[mkt] || {}, cm = Math.max(c.min || 0, gross * (c.comm || 0) / 100), ex = gross * (c.exch || 0) / 100; return cm + ex + (cm + ex) * (c.vat || 0) / 100 + gross * (c.other || 0) / 100 + (type === "sell" ? gross * (c.tax || 0) / 100 : 0); };
 const dvOf = h => divs.filter(d => d.hid === h.id);
 const dvAll = h => dvOf(h).reduce((a, d) => a + d.php, 0);
@@ -192,7 +192,7 @@ function applyTx(h){ // weighted-average cost from the transaction log
 }
 const txPanel = h => { const L = txs.filter(t => t.hid === h.id).sort((a, b) => a.date < b.date ? 1 : -1), D = dvOf(h).sort((a, b) => a.date < b.date ? 1 : -1), cu = h.mkt === "US" ? "$" : "₱", dt = d => d === "0000-00-00" ? "Opening" : d;
   return `<div class="txp"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn soft" data-tx="${h.id}" style="min-height:40px">+ Log buy / sell</button><button class="btn soft" data-div="${h.id}" style="min-height:40px">+ Log dividend</button></div>${L.length || D.length ? `<div class="txl">${L.map(t => `<div><span>${dt(t.date)} · ${t.type === "buy" ? "Buy" : "Sell"} ${num(t.shares)} @ ${cu}${num(t.price)}${t.rate ? " (₱" + num(t.rate) + ")" : ""}${t.fee ? " · fee " + cu + num(t.fee) : ""}</span><button class="x" data-txdel="${t.id}" aria-label="Delete transaction">✕</button></div>`).join("")}${D.map(d => `<div><span>${d.date} · Dividend ${h.mkt === "US" ? "$" + num(d.amt) + " (₱" + num(d.php) + ")" : "₱" + num(d.php)}</span><button class="x" data-divdel="${d.id}" aria-label="Delete dividend">✕</button></div>`).join("")}</div>` : ""}${L.length ? `<div class="lbl" style="font-size:12px;margin-top:6px">Shares, average price (fees included) and purchase rate come from the log.${h.realized ? " Realized " + signed(h.realized) + "." : ""}</div>` : ""}</div>`; };
-const tools = () => `<div class="tools"><button class="btn soft" data-export>⬇ Export backup</button><button class="btn soft" data-import>⬆ Import backup</button><button class="btn soft" data-settings>⚙ Fees &amp; taxes</button>${standalone() ? "" : `<button class="btn soft" data-install>📲 Install app</button>`}</div>`;
+const tools = () => `<div class="tools"><button class="btn soft" data-export>⬇ Export backup</button><button class="btn soft" data-import>⬆ Import backup</button><button class="btn soft" data-settings>⚙ Fees &amp; taxes</button>${standalone() ? "" : `<button class="btn soft" data-install>📲 Install app</button>`}${syncOn() ? `<button class="btn soft" data-syncnow>☁ Sync now</button><button class="btn soft" data-syncoff>Turn off sync</button>` : `<button class="btn soft" data-syncon>☁ Turn on sync</button>`}</div>${sMsg ? `<div class="lbl" style="font-size:12px;margin-top:8px">${esc(sMsg)}</div>` : ""}`;
 function perf(){
   const H = hist;
   if (H.length < 2) return `<div class="card"><h2 style="font-size:18px">Performance</h2><div class="lbl" style="margin-top:6px">History starts building today. Open the app on a few different days and your chart against the PSEi and S&amp;P 500 appears here.</div></div>`;
@@ -206,7 +206,7 @@ function perf(){
   return `<div class="card"><h2 style="font-size:18px">Performance</h2><svg viewBox="0 0 ${W} ${Ht}" width="100%" role="img" aria-label="Portfolio performance compared with the PSEi and S&amp;P 500" style="margin-top:12px;overflow:visible"><line x1="0" x2="${W}" y1="${Y(100).toFixed(1)}" y2="${Y(100).toFixed(1)}" stroke="var(--line)" stroke-dasharray="3 3"/>${lines}</svg><div class="lbl" style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px"><span>${H[0].d}</span><span>${H[H.length - 1].d}</span></div><div class="dleg">${leg}</div></div>`;
 }
 function exportData(){
-  save(); saveW(); store("portfolio-tx", txs); store("portfolio-hist", hist);
+  save(true); saveW(true); store("portfolio-tx", txs, true); store("portfolio-hist", hist, true);
   const o = {app:"portfolio-tracker", v:1, at:new Date().toISOString()}; KEYS.forEach(k => { try { o[k] = localStorage.getItem(k); } catch(e){} });
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(o, null, 1)], {type:"application/json"})); a.download = "portfolio-backup-" + new Date().toLocaleDateString("en-CA") + ".json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   status = "Backup downloaded."; render();
@@ -334,13 +334,13 @@ async function refresh(manual){
     if (d.fx > 0){ fx = d.fx; try { localStorage.setItem("portfolio-fx", fx); } catch(e){} }
     items.forEach(h => { const k = key(h); if (good(k)){ h.price = q[k].price; if (q[k].chg != null) h.chg = q[k].chg; if (q[k].asof) h.asof = q[k].asof; else delete h.asof; } });
     watchl.forEach(w => { wq[w.m + ":" + w.t] = q[w.m + ":" + w.t] || {}; });
-    save();
+    save(true);
     const tot = sum(items);
     if (tot.val > 0){
       const day = new Date().toLocaleDateString("en-CA"), b = d.bench || {}, ex = hist.find(x => x.d === day), snap = {d:day, v:Math.round(tot.val * 100) / 100, c:Math.round(tot.cost * 100) / 100, p:b.psei || (ex && ex.p), s:b.spx || (ex && ex.s)};
       if (ex) Object.assign(ex, snap); else hist.push(snap);
       if (hist.length > 800) hist.shift();
-      store("portfolio-hist", hist);
+      store("portfolio-hist", hist, true);
     }
     const miss = items.filter(h => !good(key(h))).map(h => h.ticker);
     status = "Live prices updated " + new Date().toLocaleTimeString("en-PH", {hour:"2-digit", minute:"2-digit"}) + (miss.length ? " (no price for " + miss.join(", ") + ")" : "");
@@ -357,6 +357,9 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-export]")) exportData();
   if (e.target.closest("[data-import]")) $("impFile").click();
   if (e.target.closest("[data-settings]")) openSettings();
+  if (e.target.closest("[data-syncon]")) syncOnFlow();
+  if (e.target.closest("[data-syncnow]")) syncNow();
+  if (e.target.closest("[data-syncoff]")){ ["sync-pass","sync-rev","sync-dirty"].forEach(k => { try { localStorage.removeItem(k); } catch(e2){} }); sNote("☁ Sync is off on this device."); }
   if (e.target.closest("[data-install]")){ if (ip){ ip.prompt(); ip = null; } else { status = "iPhone: tap Share, then Add to Home Screen. Android: browser menu, then Install app. A home-screen app on iPhone starts empty, so Export backup here and Import backup there."; render(); } }
   const dv = e.target.closest("[data-div]"); if (dv) openDiv(dv.dataset.div);
   const dd = e.target.closest("[data-divdel]"); if (dd && confirm("Delete this dividend?")){ divs = divs.filter(v => v.id != dd.dataset.divdel); store("portfolio-div", divs); render(); }
@@ -375,7 +378,7 @@ $("tSave").onclick = () => {
 };
 $("impFile").onchange = e => {
   const f = e.target.files[0]; if (!f) return;
-  f.text().then(t => { const o = JSON.parse(t); if (o.app !== "portfolio-tracker" || !o["portfolio-v2"]) throw new Error("not a backup"); if (!confirm("Replace everything in this browser with this backup?")) return; KEYS.forEach(k => { if (o[k] != null) localStorage.setItem(k, o[k]); else localStorage.removeItem(k); }); location.reload(); })
+  f.text().then(t => { const o = JSON.parse(t); if (o.app !== "portfolio-tracker" || !o["portfolio-v2"]) throw new Error("not a backup"); if (!confirm("Replace everything in this browser with this backup?")) return; KEYS.forEach(k => { if (o[k] != null) localStorage.setItem(k, o[k]); else localStorage.removeItem(k); }); localStorage.setItem("sync-dirty", "1"); location.reload(); })
    .catch(() => { status = "That file isn’t a valid backup."; render(); });
   e.target.value = "";
 };
@@ -395,11 +398,63 @@ $("ssheet").addEventListener("click", e => {
   if (e.target.id === "sSave"){ $("sIn").querySelectorAll("[data-sm]").forEach(i => { const v = parseFloat(i.value); settings[i.dataset.sm][i.dataset.sk] = isNaN(v) ? 0 : v; }); store("portfolio-set", settings); $("ssheet").classList.remove("open"); }
   if (e.target.id === "sClose" || e.target === $("ssheet")) $("ssheet").classList.remove("open");
 });
+let sMsg = "", sBusy = false, sTimer = null;
+const syncOn = () => { try { return !!localStorage.getItem("sync-pass"); } catch(e){ return false; } };
+const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } }, lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch(e){} }, lsDel = k => { try { localStorage.removeItem(k); } catch(e){} };
+function dirty(){ lsSet("sync-dirty", "1"); if (syncOn()){ clearTimeout(sTimer); sTimer = setTimeout(() => syncNow(), 1500); } }
+const sHead = () => ({"content-type":"application/json", "x-sync-key":lsGet("sync-pass") || ""});
+const sNote = m => { sMsg = m; const a = document.activeElement; if (!a || a.tagName !== "INPUT") render(); };
+function collect(){ save(true); saveW(true); store("portfolio-tx", txs, true); store("portfolio-div", divs, true); store("portfolio-set", settings, true); store("portfolio-hist", hist, true); const o = {}; SK.forEach(k => o[k] = lsGet(k)); return o; }
+function applyRemote(s){
+  const a = document.activeElement; if (a && ["INPUT","SELECT"].includes(a.tagName)) return false;
+  SK.forEach(k => { if (s.data[k] != null) lsSet(k, s.data[k]); else lsDel(k); });
+  lsSet("sync-rev", String(s.rev)); lsDel("sync-dirty"); location.reload(); return true;
+}
+async function syncNow(){
+  if (!syncOn() || sBusy) return; sBusy = true;
+  try {
+    const rev0 = +lsGet("sync-rev") || 0, isDirty = !!lsGet("sync-dirty");
+    const r = await fetch("/api/sync", {headers:sHead(), cache:"no-store"});
+    if (r.status === 401){ sNote("☁ Sync password was rejected. Turn sync off and on again."); return; }
+    if (r.status === 503){ sNote("☁ Sync isn’t set up on the server yet."); return; }
+    if (!r.ok) throw new Error("status " + r.status);
+    const s = await r.json();
+    if (s.data && s.rev > rev0){
+      if (!isDirty){ applyRemote(s); return; }
+      if (!confirm("Another device changed your portfolio, and this device has unsynced changes too.\n\nOK = keep THIS device’s version (overwrites the other)\nCancel = load the OTHER device’s version")){ applyRemote(s); return; }
+    }
+    if (isDirty || !s.data){
+      const p = await fetch("/api/sync", {method:"PUT", headers:sHead(), body:JSON.stringify({baseRev:s.rev, data:collect()})});
+      if (p.status === 409){ sNote("☁ Another device saved at the same moment. Syncing again…"); setTimeout(syncNow, 800); return; }
+      if (!p.ok) throw new Error("put " + p.status);
+      const j = await p.json(); lsSet("sync-rev", String(j.rev)); lsDel("sync-dirty");
+    } else lsSet("sync-rev", String(s.rev));
+    sNote("☁ Synced " + new Date().toLocaleTimeString("en-PH", {hour:"2-digit", minute:"2-digit"}));
+  } catch(e){ sNote("☁ Couldn’t reach the server. Changes are saved on this device and will sync when you’re back online."); }
+  finally { sBusy = false; }
+}
+async function syncOnFlow(){
+  const pw = prompt("Enter your sync password (the SYNC_PASSWORD you set in Vercel):"); if (!pw) return;
+  lsSet("sync-pass", pw.trim());
+  try {
+    const r = await fetch("/api/sync", {headers:sHead(), cache:"no-store"});
+    if (r.status === 401 || r.status === 503){ lsDel("sync-pass"); sNote(r.status === 401 ? "☁ Wrong sync password." : "☁ Sync isn’t set up on the server yet."); return; }
+    const s = await r.json();
+    if (s.data){
+      if (confirm("Your cloud already has a portfolio.\n\nOK = replace THIS device with the cloud version\nCancel = overwrite the cloud with THIS device’s data")){ applyRemote(s); return; }
+      lsSet("sync-rev", String(s.rev));
+    }
+    lsSet("sync-dirty", "1"); sNote("☁ Turning on sync…"); syncNow();
+  } catch(e){ lsDel("sync-pass"); sNote("☁ Couldn’t reach the server."); }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && syncOn()) syncNow(); });
+window.addEventListener("online", () => { if (syncOn()) syncNow(); });
 let ip = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); ip = e; });
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 render();
 refresh(false);
+if (syncOn()) syncNow();
 </script>
 </body>
 </html>
