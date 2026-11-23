@@ -332,7 +332,7 @@ async function refresh(manual){
     const r = await fetch("/api/prices?t=" + encodeURIComponent(keys.join(",")), {cache:"no-store"}); if (!r.ok) throw new Error("bad status");
     const d = await r.json(), q = d.quotes || {}, good = k => q[k] && q[k].price > 0;
     if (d.fx > 0){ fx = d.fx; try { localStorage.setItem("portfolio-fx", fx); } catch(e){} }
-    items.forEach(h => { const k = key(h); if (good(k)){ h.price = q[k].price; if (q[k].chg != null) h.chg = q[k].chg; if (q[k].asof) h.asof = q[k].asof; else delete h.asof; } });
+    items.forEach(h => { const k = key(h); if (good(k)){ h.price = q[k].price; if (q[k].chg != null) h.chg = q[k].chg; else delete h.chg; if (q[k].asof) h.asof = q[k].asof; else delete h.asof; } });
     watchl.forEach(w => { wq[w.m + ":" + w.t] = q[w.m + ":" + w.t] || {}; });
     save(true);
     const tot = sum(items);

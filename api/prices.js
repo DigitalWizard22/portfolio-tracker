@@ -23,15 +23,16 @@ async function stockanalysis(mkt, t) {
   if (!m) throw new Error("price not found on page");
   return { price: num(m[1]), chg: num(m[2]), asof: m[3], source: "stockanalysis.com" };
 }
-async function google(mkt, t) {
-  for (const ex of mkt === "US" ? ["NASDAQ", "NYSE"] : ["PSE"]) {
-    try {
-      const html = await (await get(`https://www.google.com/finance/quote/${t}:${ex}`)).text();
-      const m = html.match(/data-last-price="([\d.]+)"/);
-      if (m) return { price: Number(m[1]), source: "Google Finance" };
-    } catch (e) { /* try next exchange */ }
-  }
-  throw new Error("not found");
+async function google(mkt, t) { // quote pages carry the live price in data attributes
+  const one = async ex => {
+    const html = await (await get(`https://www.google.com/finance/quote/${t}:${ex}`)).text();
+    const m = html.match(/data-last-price="([\d.,]+)"/);
+    if (!m) throw new Error("no price");
+    const ts = html.match(/data-last-normal-market-timestamp="(\d+)"/), pc = html.match(/data-previous-close="([\d.,]+)"/);
+    return { price: num(m[1]), prev: pc ? num(pc[1]) : undefined, ts: ts ? Number(ts[1]) * 1000 : undefined };
+  };
+  try { return await Promise.any((mkt === "US" ? ["NASDAQ", "NYSEARCA", "NYSE", "NYSEAMERICAN", "BATS"] : ["PSE"]).map(one)); }
+  catch (e) { throw new Error("not found"); }
 }
 async function yahoo(mkt, t) {
   const sym = mkt === "US" ? t : t + ".PS";
@@ -39,12 +40,24 @@ async function yahoo(mkt, t) {
   const price = Number(meta.regularMarketPrice), prev = Number(meta.chartPreviousClose);
   return { price, chg: prev > 0 ? (price / prev - 1) * 100 : undefined, asof: new Date(meta.regularMarketTime * 1000).toISOString(), source: "Yahoo Finance" };
 }
+const TZ = { PH: "Asia/Manila", US: "America/New_York" };
+const sday = d => { const x = new Date(d + " 12:00 UTC"); return isNaN(x) ? "" : x.toISOString().slice(0, 10); }; // "Nov 20, 2026" -> 2026-11-20
 async function stock(mkt, t) {
-  const errs = [];
-  for (const [name, fn] of [["stockanalysis", stockanalysis], ["google", google], ["yahoo", yahoo]]) {
-    try { const q = await fn(mkt, t); if (Number.isFinite(q.price) && q.price > 0) return q; errs.push(name + ": bad price"); }
-    catch (e) { errs.push(name + ": " + e.message); }
+  // Google Finance is the fresher source during the session; stockanalysis is the fallback and supplies the previous close.
+  const [g, sa] = await Promise.allSettled([google(mkt, t), stockanalysis(mkt, t)]);
+  const G = g.status === "fulfilled" ? g.value : null, S = sa.status === "fulfilled" ? sa.value : null, errs = [];
+  if (!G) errs.push("google: " + g.reason.message);
+  if (!S) errs.push("stockanalysis: " + sa.reason.message);
+  if (G && G.price > 0) {
+    const gDay = new Date(G.ts || Date.now()).toLocaleDateString("en-CA", { timeZone: TZ[mkt] }), sd = S ? sday(S.asof) : "";
+    let chg;
+    if (G.prev > 0) chg = (G.price / G.prev - 1) * 100;
+    else if (S && sd && sd < gDay) chg = (G.price / S.price - 1) * 100; // stockanalysis still shows the previous close
+    else if (S && S.chg != null) chg = S.chg;
+    return { price: G.price, chg, asof: G.ts ? new Date(G.ts).toISOString() : undefined, source: "Google Finance" };
   }
+  if (S) return S;
+  try { return await yahoo(mkt, t); } catch (e) { errs.push("yahoo: " + e.message); }
   throw new Error(errs.join("; "));
 }
 async function fund(t) {
