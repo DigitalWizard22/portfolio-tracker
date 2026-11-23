@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>My Portfolio</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0F1420" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#EEF2F8" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Portfolio">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0F1420;--card:#151C2C;--chip:#1B2438;--ink:#F2F5FA;--mut:#8C97AD;--line:#232D44;--sky:#3BB0F0;--blue:#3B82F6;--c3:#B58CF0;--teal:#5CC4A8;--up:#5CC4A8;--down:#F06B5A;--upbg:rgba(92,196,168,.15);--downbg:rgba(240,107,90,.15);--g1:#47B8F5;--g2:#2F66E6;--warn:#E0A526;color-scheme:dark;
@@ -150,6 +159,7 @@ const pill = p => `<span class="pill ${p >= 0 ? "up" : "down"}">${p >= 0 ? "▲"
 const kinds = {stock:{title:"Stock Holdings", sub:"PH Stocks", all:"All Stocks", icon:"₱"}, fund:{title:"Fund Portfolio", sub:"PH Mutual Funds / UITFs", all:"All Funds", icon:"₱"}, us:{title:"US Stocks", sub:"NASDAQ / NYSE, converted to ₱", all:"All US Stocks", icon:"$"}};
 const g = h => h.kind === "fund" ? "fund" : h.mkt === "US" ? "us" : "stock", cs = h => h.mkt === "US" ? "$" : "";
 
+const standalone = () => matchMedia("(display-mode: standalone)").matches || (typeof navigator !== "undefined" && navigator.standalone === true);
 const KEYS = ["portfolio-v2","portfolio-watch","portfolio-fx","portfolio-tx","portfolio-hist","portfolio-div","portfolio-set"];
 const feeOf = (mkt, type, gross) => { const c = settings[mkt] || {}, cm = Math.max(c.min || 0, gross * (c.comm || 0) / 100), ex = gross * (c.exch || 0) / 100; return cm + ex + (cm + ex) * (c.vat || 0) / 100 + gross * (c.other || 0) / 100 + (type === "sell" ? gross * (c.tax || 0) / 100 : 0); };
 const dvOf = h => divs.filter(d => d.hid === h.id);
@@ -182,7 +192,7 @@ function applyTx(h){ // weighted-average cost from the transaction log
 }
 const txPanel = h => { const L = txs.filter(t => t.hid === h.id).sort((a, b) => a.date < b.date ? 1 : -1), D = dvOf(h).sort((a, b) => a.date < b.date ? 1 : -1), cu = h.mkt === "US" ? "$" : "₱", dt = d => d === "0000-00-00" ? "Opening" : d;
   return `<div class="txp"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn soft" data-tx="${h.id}" style="min-height:40px">+ Log buy / sell</button><button class="btn soft" data-div="${h.id}" style="min-height:40px">+ Log dividend</button></div>${L.length || D.length ? `<div class="txl">${L.map(t => `<div><span>${dt(t.date)} · ${t.type === "buy" ? "Buy" : "Sell"} ${num(t.shares)} @ ${cu}${num(t.price)}${t.rate ? " (₱" + num(t.rate) + ")" : ""}${t.fee ? " · fee " + cu + num(t.fee) : ""}</span><button class="x" data-txdel="${t.id}" aria-label="Delete transaction">✕</button></div>`).join("")}${D.map(d => `<div><span>${d.date} · Dividend ${h.mkt === "US" ? "$" + num(d.amt) + " (₱" + num(d.php) + ")" : "₱" + num(d.php)}</span><button class="x" data-divdel="${d.id}" aria-label="Delete dividend">✕</button></div>`).join("")}</div>` : ""}${L.length ? `<div class="lbl" style="font-size:12px;margin-top:6px">Shares, average price (fees included) and purchase rate come from the log.${h.realized ? " Realized " + signed(h.realized) + "." : ""}</div>` : ""}</div>`; };
-const tools = () => `<div class="tools"><button class="btn soft" data-export>⬇ Export backup</button><button class="btn soft" data-import>⬆ Import backup</button><button class="btn soft" data-settings>⚙ Fees &amp; taxes</button></div>`;
+const tools = () => `<div class="tools"><button class="btn soft" data-export>⬇ Export backup</button><button class="btn soft" data-import>⬆ Import backup</button><button class="btn soft" data-settings>⚙ Fees &amp; taxes</button>${standalone() ? "" : `<button class="btn soft" data-install>📲 Install app</button>`}</div>`;
 function perf(){
   const H = hist;
   if (H.length < 2) return `<div class="card"><h2 style="font-size:18px">Performance</h2><div class="lbl" style="margin-top:6px">History starts building today. Open the app on a few different days and your chart against the PSEi and S&amp;P 500 appears here.</div></div>`;
@@ -347,6 +357,7 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-export]")) exportData();
   if (e.target.closest("[data-import]")) $("impFile").click();
   if (e.target.closest("[data-settings]")) openSettings();
+  if (e.target.closest("[data-install]")){ if (ip){ ip.prompt(); ip = null; } else { status = "iPhone: tap Share, then Add to Home Screen. Android: browser menu, then Install app. A home-screen app on iPhone starts empty, so Export backup here and Import backup there."; render(); } }
   const dv = e.target.closest("[data-div]"); if (dv) openDiv(dv.dataset.div);
   const dd = e.target.closest("[data-divdel]"); if (dd && confirm("Delete this dividend?")){ divs = divs.filter(v => v.id != dd.dataset.divdel); store("portfolio-div", divs); render(); }
   const t = e.target.closest("[data-tx]"); if (t) openTx(t.dataset.tx);
@@ -384,6 +395,9 @@ $("ssheet").addEventListener("click", e => {
   if (e.target.id === "sSave"){ $("sIn").querySelectorAll("[data-sm]").forEach(i => { const v = parseFloat(i.value); settings[i.dataset.sm][i.dataset.sk] = isNaN(v) ? 0 : v; }); store("portfolio-set", settings); $("ssheet").classList.remove("open"); }
   if (e.target.id === "sClose" || e.target === $("ssheet")) $("ssheet").classList.remove("open");
 });
+let ip = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); ip = e; });
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 render();
 refresh(false);
 </script>
