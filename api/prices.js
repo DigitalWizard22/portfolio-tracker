@@ -87,11 +87,8 @@ async function psei() { // PSE Edge index summary table
   if (!m) throw new Error("PSEi not found");
   return num(m[1]);
 }
-async function spx() { // S&P 500 on Google Finance
-  const html = await (await get("https://www.google.com/finance/quote/.INX:INDEXSP")).text();
-  const m = html.match(/data-last-price="([\d.,]+)"/);
-  if (!m) throw new Error("S&P 500 not found");
-  return num(m[1]);
+async function spx() { // S&P 500 stand-in: VOO tracks the index, and the chart only uses % change since the first day
+  return (await stockanalysis("US", "VOO")).price;
 }
 
 module.exports = async (req, res) => {
